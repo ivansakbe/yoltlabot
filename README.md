@@ -46,3 +46,5 @@ Muestra la estadistica de cuantas tareas se encuentran corriendo, en espera o en
 ```
 Muestra un detallado de las tareas por partición, muestra las tareas pendientes (PD) y las tareas que se están ejecutando (R), solo aparecen las particiones que se encuentran con alguno de estos parametros.
 ![alt text](img/dstatus.png "/dstatus")
+
+continuara...
