@@ -1,0 +1,40 @@
+#!/bin/bash
+case $1 in 
+	"swapDraining" ) #Checa los nodos en estado Draining, swap
+		sinfo -o '%n %H %E' -t DRAINING | grep -e 'swap' | cut -d ' ' -f 1,5 
+		;;
+	"Lustre" ) #Checa los discos con problemas en Lustre
+		ssh oss$2 /opt/MegaRAID/MegaCli/LSI.check drives | grep Yes | cut -d '|' -f 2 #para desactivar, comente esta linea 
+		;;
+	"Rebuild" )#Checa los discos en estado Rebuild en Lustre
+		ssh oss$2 /opt/MegaRAID/MegaCli/LSI.check drives | grep Rebuild | cut -d '|' -f 2 
+		;;
+	"oomDraining")#Checa los nodos en estado Draining, swap
+		sinfo -o '%n %H %E' -t DRAINING | grep -e 'oom' | cut -d ' ' -f 1,6 
+		;;
+	"gpu")#Checa los nodos en estado Draning, gpu
+		sinfo -R -o \"%n %35E\" -t DRAINING | grep -e \"gres/gpu\" | cut -d ' ' -f 1 
+		;;
+	"oomDrained")#Checa los nodos en estado Drained, oom
+		sinfo -o '%n %H %E' -t DRAINED | grep -e 'check_oom:' | cut -d ' ' -f 1,6 | column -t 
+		;;
+	"swapDrained")#Checa los nodos en estado Drained, swap
+		sinfo -o '%n %H %E' -t DRAINED | grep -e 'swap' | cut -d ' ' -f 1,5 | column -t 
+		;;
+	"oomDrained")#Checa los nodos en estado Drained, swap
+                sinfo -o '%n %H %E' -t DRAINED | grep -e 'oom' | cut -d ' ' -f 1,5 | column -t
+                ;;
+	"status")#Checa el estado de la cola de tareas
+		echo "Running : $(squeue -t R -h | wc -l)" 
+		echo "Pending : $(squeue -t pd -h | wc -l)"
+		echo "idle : $(sinfo -Nti | cut -d ' ' -f 1 | uniq | wc -l)" 
+		;;
+	"dstatus")#Realiza un reporte detallado del estado de la cola de tareas segun su particion
+		PARTS=$(sinfo -h -O partitionname | tr '\n' ' ') 
+		for part in $PARTS; do 
+			squeue -h -p $part | awk -v part=$part 'BEGIN { pending=running=0 } ($5 ~ /^PD/){pending++ } ($5 ~ /[rRt]/){running++ } END {if($pending!=0 && $running!=0){print part " PD: " pending " R: " running}}'
+		done 
+		;;
+	*)
+		echo "Comando Invalido" ;;
+esac

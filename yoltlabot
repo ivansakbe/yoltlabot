@@ -1,0 +1,162 @@
+#!/LUSTRE/home/uam/izt/pdcs/alumnos/a.iocr/miniconda2/bin/python
+import sys
+import time
+import random
+import datetime
+import telepot
+import telepot.helper
+from telepot.loop import MessageLoop
+from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
+from telepot.delegate import (per_chat_id, per_callback_query_origin, create_open, pave_event_space)
+import commands
+swap1=list()
+procSwap=list()
+oom1=list()
+procOom=list()
+gpu1=list()
+def notificacionLustre(id):
+	for i in range(0,9):
+		#aux=commands.getoutput("ssh oss"+str(i)+" /opt/MegaRAID/MegaCli/LSI.check drives | egrep -w 'Yes|Rebuild'|cut -f 2,4,5 -d '|' --output-delimiter=' '").splitlines
+		aux=commands.getoutput("ssh oss"+str(i)+" /opt/MegaRAID/MegaCli/LSI.check drives | grep Yes | cut -d '|' -f 2")
+		if aux != "":
+			for j in id:
+				msg="ALERTA SMART ("+str(i)+") en disco slot  "+aux
+				bot.sendMessage(j,msg)
+		aux=commands.getoutput("ssh oss"+str(i)+" /opt/MegaRAID/MegaCli/LSI.check drives | grep Rebuild | cut -d '|' -f 2")
+		if aux != "":
+			for j in id:
+				bot.sendMessage(j,"RECONSTRUYENDO ("+str(i)+") en disco slot "+aux)
+
+def notificacionswap(id):
+	aux=commands.getoutput("./ordenes swapDraining").splitlines()
+	aux1=[]
+	for i in aux:
+		i=i.split()
+		aux1.append(i[0])
+		if i[0] not in swap1:
+			swap1.append(i[0])
+			procSwap.append(i[1])
+			env(0,str("Draining:\nNodo "+i[0]+" Entro a Swap: " + i[1]))
+	i=0
+	while i<len(swap1): 
+		if swap1[i] not in aux1:
+			swap1.remove(swap1[i])
+			procSwap.remove(procSwap[i])
+			i=0
+		else:
+			i+=1
+
+
+def notificacionoom(id):
+        aux=commands.getoutput("sinfo -o '%n %H %E' -t DRAINING | grep -e 'oom' | cut -d ' ' -f 1,6 ").splitlines()
+        aux1=[]
+	for i in aux:
+		i=i.split()
+		aux1.append(i[0])
+		if i[0] not in oom1:
+			oom1.append(i[0])
+			if len(i)!=1: procOom.append(i[1])
+			else: procOom.append("no process")
+			bot.sendMessage(id[j],"Draining:\nNodo "+i[0]+" Entro a OOM: " + i[1])
+	i=0
+	while i<len(oom1):
+		if oom1[i] not in aux1:
+			oom1.remove(swap1[i])
+			procOom.remove(procOom[i])
+			i=0
+		else:
+			i+=1
+
+def notificaciongpu(id):
+        aux=commands.getoutput("sinfo -R -o \"%n %35E\" -t DRAINING | grep -e \"gres/gpu\" | cut -d ' ' -f 1").splitlines()
+        for i in gpu1:
+                if i not in aux:
+                        gpu1.remove(i)
+        for i in aux:
+                if i not in gpu1:
+                        for j in id:
+                                bot.sendMessage(j,"Draining:\nAlerta GPU Nodo: " + i)
+                        gpu1.append(i)
+def teclado(swap,oom,chat_id):
+	aux=swap+oom
+	keyboard=[]
+	contador = 0
+	for a in aux : 
+		keyboard=[['1','2'],['3','4']]
+		contador+=1
+	markup = ReplyKeyboardMarkup(keyboard=[
+		[KeyboardButton(text='Text only'), KeyboardButton(text='Text only'), KeyboardButton(text='Salir')],
+#		[dict(text='Phone', request_contact=True), KeyboardButton(text='Location', request_location=True)],
+		])
+	bot.sendMessage(chat_id, 'Elija Nodo', reply_markup=markup)
+def mensaje(oom,swap,gpu):
+	mensaje=''
+	if swap != '' :
+		mensaje=mensaje + "\nswap:\n" + swap
+	if oom != '' :
+		mensaje=mensaje + "\noom:\n" + oom
+	if gpu != '' :
+		mensaje=mensaje + "\ngpu:\n" + gpu
+	return mensaje
+def env(destinatario,mensaje):
+	if destinatario==0:
+		for i in id:
+			bot.sendMessage(i,mensaje)
+	else:
+		bot.sendMessage(destinatario,mensaje)
+
+def handle(msg):
+	content_type, chat_type, chat_id = telepot.glance(msg)
+	print(content_type, chat_type, chat_id,datetime.datetime.now()) 
+	if content_type == 'text':
+		if msg['text'] == '/start' :
+			if chat_id not in id:
+				id.append(chat_id)
+				bot.sendMessage(chat_id,"Bienvenido al bot LSVP")
+		if msg['text'] == '/sinfo' or msg['text'] == '/sinfo@LSVPbot' :
+                        oom=commands.getoutput("sinfo -o '%n %H %E' -t DRAINING | grep -e 'check_oom:' | cut -d ' ' -f 1,6 | column -t ")
+                        swap=commands.getoutput("sinfo -o '%n %H %E' -t DRAINING | grep -e 'swap' | cut -d ' ' -f 1,5 | column -t")
+			gpu=commands.getoutput("sinfo -R -o \"%n %35E\" -t DRAINING | grep -e \"gres/gpu\" | cut -d ' ' -f 1")
+			draining=0
+                        if oom != "" or swap != "" or gpu != "" :
+                                bot.sendMessage(chat_id,"Draining:" + mensaje(oom,swap,gpu))
+				draining=1
+                        oom=commands.getoutput("sinfo -o '%n %H %E' -t DRAINED | grep -e 'check_oom:' | cut -d ' ' -f 1,6 | column -t")
+                        swap=commands.getoutput("sinfo -o '%n %H %E' -t DRAINED | grep -e 'swap' | cut -d ' ' -f 1,5 | column -t")
+			gpu=commands.getoutput("sinfo -R -o \"%n %35E\" -t DRAINED | grep -e \"gres/gpu\" | cut -d ' ' -f 1")
+
+			if oom != "" or swap != "" or gpu != "" :
+				bot.sendMessage(chat_id,"Drained:" + mensaje(oom,swap,gpu) )
+				#swap=commands.getoutput("sinfo -o '%n %H %E' -t DRAINED | grep -e 'swap' | cut -d ' ' -f 1 ").splitlines()
+				#oom=commands.getoutput("sinfo -o '%n %H %E' -t DRAINED | grep -e 'check_oom:' | cut -d ' ' -f 1 ").splitlines()
+				#teclado(swap,oom,chat_id)
+			if oom == "" and swap == "" and gpu == "" and draining == 0 :
+				bot.sendMessage(chat_id,'Todo en orden')
+		elif msg['text'] == '/status' or msg['text'] == '/status@LSVPbot' : #Informa sobre las tareas que se encuentran en estado Running,Pending y idle
+			bot.sendMessage(chat_id,commands.getoutput("echo \"Running : $(squeue -t R -h | wc -l)\" ; echo \"Pending : $(squeue -t pd -h | wc -l)\" ; echo \"idle : $(sinfo -Nti | cut -d ' ' -f 1 | uniq | wc -l)\""))
+		elif msg['text'] == '/dstatus' or msg['text'] == '/dstatus@LSVPbot' :
+			bot.sendMessage(chat_id,commands.getoutput("./ordenes dstatus"))
+		else : 
+			bot.sendMessage(chat_id,"No se encontro el comando")
+		print ('Listening ...')
+TOKEN = '405476910:AAEc9Ix260UGuhy5eRT4uOEJfHE5WNLldlQ' 
+bot = telepot.Bot(TOKEN)
+MessageLoop(bot, handle).run_as_thread()
+print ('Listening ...')
+# Keep the program running.
+contador=600
+while 1:
+	#id=[382565464,-311873608]
+	id=[-311873608]
+	if contador%300 ==0: #cada 5 minutos
+		print "otros "+str(contador)+" "+str(datetime.datetime.now())
+		notificacionswap(id)
+		#notificacionoom(id)
+		notificaciongpu(id)
+		notificacionLustre(id)
+		if contador==600: #cada 10 minutos
+			print "lustre"+str(contador)
+			#notificacionLustre(id)
+			contador=0
+	contador+=10
+	time.sleep(10)

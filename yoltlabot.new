@@ -1,0 +1,154 @@
+#!/LUSTRE/home/uam/izt/pdcs/alumnos/a.iocr/miniconda2/bin/python
+import sys
+import time
+import random
+import datetime
+import telepot
+import telepot.helper
+from telepot.loop import MessageLoop
+from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
+from telepot.delegate import (per_chat_id, per_callback_query_origin, create_open, pave_event_space)
+import commands
+swap1=list()
+procSwap=list()
+oom1=list()
+gpu1=list()
+def notificacionLustre(id):
+	for i in range(0,9):
+		aux=commands.getoutput("./ordenes Lustre "+str(i))
+		if aux != "":
+			env(0,str("ALERTA SMART ("+str(i)+") en disco slot  "+aux))
+		aux=commands.getoutput("./ordenes Rebuild "+str(i))
+		if aux != "":
+			env(0,str("RECONSTRUYENDO ("+str(i)+") en disco slot "+aux))
+
+def notificacionswap(id):
+	aux=commands.getoutput("./ordenes swapDraining").splitlines()
+	aux1=[]
+	for i in aux:
+		i=i.split()
+		aux1.append(i[0])
+		if swap1.count(i[0])==0:
+			swap1.append(i[0])
+			procSwap.append(i[1])
+			env(0,str("Draining:\nNodo "+i[0]+" Entro a Swap: " + i[1]))
+	i=0
+	while i<lenswap():
+		if aux1.count(swap1[i])==0:
+			swap1.remove(swap1[i])
+			procSwap.remove(procSwap[i])
+			i=0
+		else:
+			i+=1
+def notificacionoom(id):
+        aux=commands.getoutput("./ordenes oomDraining").splitlines()
+        aux1=[]
+        for i in aux:
+                aux1.append(i.split())
+        if len(oom1)==0:
+		for i in range(0,len(aux1)):
+			oom1.append(i)
+			env(0,str("Draining:\nNodo "+aux1[i][0]+" Entro a OOM: " + aux1[i][1]))
+	else:
+		elimina=[]
+		for i in range(0,len(oom1)):
+			delete=True
+			for j in aux1:
+				if oom1[i][0]==j[0]:
+					delete=False
+			if delete:
+				elimina.append(i)
+		for i in range(0,len(elimina)):
+			oom1.pop(elimina[i]-i)
+		for i in aux1:
+			enviar=True
+			for j in range(0,len(oom1)):
+				if oom1[i][0]==aux1[j][0]:
+					enviar=False
+			if enviar:
+				oom1.append(aux1[i])
+				env(0,str("Draining:\nNodo "+aux1[i][0]+" Entro a oom: " + aux[i][1]))
+
+def notificaciongpu(id):
+        aux=commands.getoutput("./ordenes gpu").splitlines()
+        for i in gpu1:
+                if i not in aux:
+                        gpu1.remove(i)
+        for i in aux:
+                if i not in gpu1:
+			env(0,str("Draining:\nAlerta GPU Nodo: " + i))
+                        gpu1.append(i)
+def teclado(swap,oom,chat_id):
+	aux=swap+oom
+	keyboard=[]
+	contador = 0
+	for a in aux : 
+		keyboard=[['1','2'],['3','4']]
+		contador+=1
+	markup = ReplyKeyboardMarkup(keyboard=[
+		[KeyboardButton(text='Text only'), KeyboardButton(text='Text only'), KeyboardButton(text='Salir')],
+#		[dict(text='Phone', request_contact=True), KeyboardButton(text='Location', request_location=True)],
+		])
+	bot.sendMessage(chat_id, 'Elija Nodo', reply_markup=markup)
+def mensaje(oom,swap,gpu):
+	mensaje=''
+	if swap != '' :
+		mensaje=mensaje + "\nswap:\n" + swap
+	if oom != '' :
+		mensaje=mensaje + "\noom:\n" + oom
+	if gpu != '' :
+		mensaje=mensaje + "\ngpu:\n" + gpu
+	return mensaje
+def env(destinatario,mensaje):
+	if destinatario==0:
+		for i in id:
+			bot.sendMessage(i,mensaje)
+	else:
+		bot.sendMessage(destinatario,mensaje)
+def handle(msg):
+	content_type, chat_type, chat_id = telepot.glance(msg)
+	print(content_type, chat_type, chat_id,datetime.datetime.now()) 
+	if content_type == 'text':
+		if msg['text'] == '/start' :
+			if chat_id not in id:
+				id.append(chat_id)
+				env(chat_id,"Bienvenido al bot LSVP")
+		if msg['text'] == '/sinfo' or msg['text'] == '/sinfo@LSVPbot' :
+                        oom=commands.getoutput("./ordenes oomDraining")
+                        swap=commands.getoutput("./ordenes swapDraining")
+			gpu=commands.getoutput("./ordenes gpu")
+			draining=0
+                        if oom != "" or swap != "" or gpu != "" :
+                                env(chat_id,"Draining:" + mensaje(oom,swap,gpu))
+				draining=1
+                        oom=commands.getoutput("")
+                        swap=commands.getoutput("")
+
+			if oom != "" or swap != "" :
+				env(chat_id,"Drained:" + mensaje(oom,swap,gpu) )
+			if oom == "" and swap == "" and gpu == "" and draining == 0 :
+				env(chat_id,'Todo en orden')
+		elif msg['text'] == '/status' or msg['text'] == '/status@LSVPbot' : #Informa sobre las tareas que se encuentran en estado Running,Pending y idle
+			env(chat_id,commands.getoutput("./ordenes status"))
+		elif msg['text'] == '/dstatus' or msg['text'] == '/dstatus@LSVPbot' :
+			env(chat_id,commands.getoutput("./ordenes dstatus"))
+		else : 
+			env(chat_id,"No se encontro el comando")
+		print ('Listening ...')
+TOKEN = sys.argv[1]#'405476910:AAEc9Ix260UGuhy5eRT4uOEJfHE5WNLldlQ' 
+bot = telepot.Bot(TOKEN)
+MessageLoop(bot, handle).run_as_thread()
+print ('Listening ...')
+# Keep the program running.
+contador=600
+while 1:
+	id=[-311873608,382565464]
+	if contador%300 ==0: #cada 5 minutos
+		print "otros "+str(contador)+" "+str(datetime.datetime.now())
+		#notificacionswap(id)
+		#notificacionoom(id)
+		#notificaciongpu(id)
+		notificacionLustre(id)
+		contador=0
+	contador+=10
+	time.sleep(10)

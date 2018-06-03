@@ -1,0 +1,2 @@
+/sinfo	sinfo -o '%n %H %E' -t DRAINING | grep -e 'swap' | cut -d ' ' -f 1,5
+/info	sinfo -R
